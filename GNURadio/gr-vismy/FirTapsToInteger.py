@@ -1,0 +1,103 @@
+#!/usr/bin/env python
+
+import itertools as it
+
+import numpy as np
+from gnuradio.filter import firdes as fir
+
+
+class FIRfilterIntegerCoefficients(object):
+    '''
+    The purpose of this class is to convert the real values in FIR filter to integer quantized representation with at most MAX_BIT_SET_SIZE bits
+    '''
+
+    def __init__(self, maxBitSetSize=2, maxBitWidth=20):
+        self.maxBitSetSize = maxBitSetSize
+        self.maxBitWidth = maxBitWidth
+
+    def __call__(self, hFIR):
+        '''
+        Convert the FIR filter coefficients to its integer representation, making the filter computations as left shift operations, followed by a final right shift operation
+
+        The function returns the FIR coefficients as Numerator-> Vector and Denominator -> Scalar
+        '''
+        requireWidth = -np.floor(np.log2(np.min(np.abs(hFIR))))
+        #
+        if requireWidth > self.maxBitWidth:
+            raise ValueError("Required Fixed Point Width is greater than Max Width")
+        #
+        h = np.round(hFIR/2**(-requireWidth))
+        numBits = int(requireWidth)
+        print(f'numBits = {numBits}')
+
+        searchSet = [2**i for i in range(numBits+1)] + [-2**i for i in range(numBits+1)]
+
+        hTruncated = []
+
+        for el in h:
+            s = self.MinSubsetOfTargetSum(searchSet, 2*(numBits+1), el, self.maxBitSetSize)
+            print(s)
+            hTruncated.append(sum(s))
+
+        denominator = np.sum(hTruncated)
+        denominatorShift = np.round(np.log2(abs(denominator)))
+        print(f"Denominator Shift={denominatorShift}")
+        return [hTruncated, np.sign(denominator)*2**denominatorShift]
+
+    @staticmethod
+    def MinSubsetOfTargetSum(set, n, val, maxBitSetSize):
+        '''
+        Core logic to find the best subset representing the value VAL
+        '''
+        count = 0
+        minSubSet = []
+        sizeSSET = n
+        # identify the shift combinations in the sparse form
+        for i in range(1, n):
+            foundFlag = 0
+            sparseSet = it.combinations(range(n), i)
+            for bits in sparseSet:
+                subSet = [set[i] for i in bits]
+                if sum(subSet) == val:
+                    count += 1
+                    foundFlag = 1
+                    minSubSet = subSet
+                    break
+            if foundFlag == 1:
+                break
+
+        # it means no subset is found with given sum
+        if (count == 0):
+
+            print("No subset is found")
+
+        else:
+            print(np.sum(minSubSet), '-> \t', end='')
+            if len(minSubSet) <= maxBitSetSize:
+                return minSubSet
+            else:
+                restrictedSubSet = []
+                # Restrict the MIN_SUBSET to size MAX_BIT_SET_SIZE
+                for m in range(maxBitSetSize):
+                    indexElement = np.argmax(np.abs(minSubSet))
+                    maxElement = minSubSet[indexElement]
+                    minSubSet.remove(maxElement)
+                    restrictedSubSet.append(maxElement)
+                return restrictedSubSet
+
+
+def main():
+    g = 1
+    t = 20
+    fs = 250
+    factor = 4
+    hFIR = fir.low_pass(gain=g, sampling_freq=fs, cutoff_freq=fs/factor-t/2, transition_width=t)
+    convertor = FIRfilterIntegerCoefficients()
+    [b, a] = convertor(hFIR)
+    for hEll in range(len(hFIR)):
+        print(f'{hFIR[hEll]} -> {b[hEll]/a}')
+    # print(f'Filter with integer coefficients:{b}')
+
+
+if __name__ == '__main__':
+    main()
