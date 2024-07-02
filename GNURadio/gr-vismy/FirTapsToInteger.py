@@ -7,20 +7,28 @@ from gnuradio.filter import firdes as fir
 
 
 class FIRfilterIntegerCoefficients(object):
-    '''
-    The purpose of this class is to convert the real values in FIR filter to integer quantized representation with at most MAX_BIT_SET_SIZE bits
-    '''
+    """!
+    @brief The purpose of this class is to convert the real values in FIR filter to integer quantized representation with at most MAX_BIT_SET_SIZE bits. That is, every real-valued coefficient is converted to its sparse form with atmost MAX_BIT_SET_SIZE. For example, if  MAX_BIT_SET_SIZE=2 the integer representation is an addition (or subtraction) of two integers which are powers of 2.
+    """
 
     def __init__(self, maxBitSetSize=2, maxBitWidth=20):
+        """!
+        @brief Filter converter initializer
+
+        @param maxBitSetSize Number of elements in the sparse set
+        @param maxBitWidth Total bit width of the coefficient representation
+        """
         self.maxBitSetSize = maxBitSetSize
         self.maxBitWidth = maxBitWidth
 
     def __call__(self, hFIR):
-        '''
+        """!
         Convert the FIR filter coefficients to its integer representation, making the filter computations as left shift operations, followed by a final right shift operation
 
         The function returns the FIR coefficients as Numerator-> Vector and Denominator -> Scalar
-        '''
+
+        @param hFIR List/Array of FIR filter coefficients
+        """
         requireWidth = -np.floor(np.log2(np.min(np.abs(hFIR))))
         #
         if requireWidth > self.maxBitWidth:
@@ -48,6 +56,11 @@ class FIRfilterIntegerCoefficients(object):
     def MinSubsetOfTargetSum(set, n, val, maxBitSetSize):
         '''
         Core logic to find the best subset representing the value VAL
+
+        @param set list which is the search space for the sparse representation
+        @param n the size of the search space list
+        @param val the value of the integer to be converted
+        @param maxBitSetSize the sparsity requirement of the value
         '''
         count = 0
         minSubSet = []
