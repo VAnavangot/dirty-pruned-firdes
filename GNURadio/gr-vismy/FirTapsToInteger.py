@@ -45,7 +45,7 @@ class FIRfilterIntegerCoefficients(object):
         for el in h:
             s = self.MinSubsetOfTargetSum(searchSet, 2*(numBits+1), el, self.maxBitSetSize)
             print(s)
-            hTruncated.append(sum(s))
+            hTruncated.append(sum(s))   #sparse quantized coefficient
 
         denominator = np.sum(hTruncated)
         denominatorShift = np.round(np.log2(abs(denominator)))
