@@ -11,7 +11,7 @@ class FIRfilterIntegerCoefficients(object):
     @brief The purpose of this class is to convert the real values in FIR filter to integer quantized representation with at most MAX_BIT_SET_SIZE bits. That is, every real-valued coefficient is converted to its sparse form with atmost MAX_BIT_SET_SIZE. For example, if  MAX_BIT_SET_SIZE=2 the integer representation is an addition (or subtraction) of two integers which are powers of 2.
     """
 
-    def __init__(self, maxBitSetSize=2, maxBitWidth=20):
+    def __init__(self, maxBitSetSize=2: int, maxBitWidth=20: int)-> None:
         """!
         @brief Filter converter initializer
 
@@ -34,34 +34,46 @@ class FIRfilterIntegerCoefficients(object):
         if requireWidth > self.maxBitWidth:
             raise ValueError("Required Fixed Point Width is greater than Max Width")
         #
-        h = np.round(hFIR/2**(-requireWidth))
+        h = np.round(hFIR / 2 ** (-requireWidth))
         numBits = int(requireWidth)
-        print(f'numBits = {numBits}')
+        print(f"numBits = {numBits}")
 
-        searchSet = [2**i for i in range(numBits+1)] + [-2**i for i in range(numBits+1)]
+        searchSet = [2**i for i in range(numBits + 1)] + [
+            -(2**i) for i in range(numBits + 1)
+        ]
 
         hTruncated = []
 
         for el in h:
-            s = self.MinSubsetOfTargetSum(searchSet, 2*(numBits+1), el, self.maxBitSetSize)
+            s = self.MinSubsetOfTargetSum(
+                searchSet, 2 * (numBits + 1), el, self.maxBitSetSize
+            )
             print(s)
-            hTruncated.append(sum(s))   #sparse quantized coefficient
+            hTruncated.append(sum(s))  # sparse quantized coefficient
 
         denominator = np.sum(hTruncated)
         denominatorShift = np.round(np.log2(abs(denominator)))
         print(f"Denominator Shift={denominatorShift}")
-        return [hTruncated, np.sign(denominator)*2**denominatorShift]
+        # TODO: return an integer array with the index location of the sparse factors
+        return [hTruncated, np.sign(denominator) * 2**denominatorShift]
+
+    @staticmethod
+    def ErrorVectorMetric(h, hHat):
+        assert len(h) == len(
+            hHat
+        ), "Filter lengths should be identical to compute error metric"
+        return np.abs(h - hHat)
 
     @staticmethod
     def MinSubsetOfTargetSum(set, n, val, maxBitSetSize):
-        '''
+        """
         Core logic to find the best subset representing the value VAL
 
         @param set list which is the search space for the sparse representation
         @param n the size of the search space list
         @param val the value of the integer to be converted
         @param maxBitSetSize the sparsity requirement of the value
-        '''
+        """
         count = 0
         minSubSet = []
         sizeSSET = n
@@ -80,12 +92,12 @@ class FIRfilterIntegerCoefficients(object):
                 break
 
         # it means no subset is found with given sum
-        if (count == 0):
+        if count == 0:
 
             print("No subset is found")
 
         else:
-            print(np.sum(minSubSet), '-> \t', end='')
+            print(np.sum(minSubSet), "-> \t", end="")
             if len(minSubSet) <= maxBitSetSize:
                 return minSubSet
             else:
@@ -104,13 +116,15 @@ def main():
     t = 20
     fs = 250
     factor = 4
-    hFIR = fir.low_pass(gain=g, sampling_freq=fs, cutoff_freq=fs/factor-t/2, transition_width=t)
+    hFIR = fir.low_pass(
+        gain=g, sampling_freq=fs, cutoff_freq=fs / factor - t / 2, transition_width=t
+    )
     convertor = FIRfilterIntegerCoefficients()
     [b, a] = convertor(hFIR)
     for hEll in range(len(hFIR)):
-        print(f'{hFIR[hEll]} -> {b[hEll]/a}')
+        print(f"{hFIR[hEll]} -> {b[hEll]/a}")
     # print(f'Filter with integer coefficients:{b}')
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
