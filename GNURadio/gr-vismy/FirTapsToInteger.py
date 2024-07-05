@@ -4,6 +4,7 @@ import itertools as it
 
 import numpy as np
 from gnuradio.filter import firdes as fir
+from loguru import logger
 
 
 class FIRfilterIntegerCoefficients(object):
@@ -11,7 +12,7 @@ class FIRfilterIntegerCoefficients(object):
     @brief The purpose of this class is to convert the real values in FIR filter to integer quantized representation with at most MAX_BIT_SET_SIZE bits. That is, every real-valued coefficient is converted to its sparse form with atmost MAX_BIT_SET_SIZE. For example, if  MAX_BIT_SET_SIZE=2 the integer representation is an addition (or subtraction) of two integers which are powers of 2.
     """
 
-    def __init__(self, maxBitSetSize=2: int, maxBitWidth=20: int)-> None:
+    def __init__(self, maxBitSetSize:int =2, maxBitWidth:int=20)-> None:
         """!
         @brief Filter converter initializer
 
@@ -20,6 +21,17 @@ class FIRfilterIntegerCoefficients(object):
         """
         self.maxBitSetSize = maxBitSetSize
         self.maxBitWidth = maxBitWidth
+    
+    @staticmethod
+    def convertTapsToInteger(hFIR, maxBitWidth:int=20):
+        requireWidth = -np.floor(np.log2(np.min(np.abs(hFIR))))
+        #
+        if requireWidth > maxBitWidth:
+            raise ValueError("Required Fixed Point Width is greater than Max Width")
+        #
+        h = np.round(hFIR / 2 ** (-requireWidth))
+        return (h, requireWidth)
+
 
     def __call__(self, hFIR):
         """!
@@ -29,14 +41,8 @@ class FIRfilterIntegerCoefficients(object):
 
         @param hFIR List/Array of FIR filter coefficients
         """
-        requireWidth = -np.floor(np.log2(np.min(np.abs(hFIR))))
-        #
-        if requireWidth > self.maxBitWidth:
-            raise ValueError("Required Fixed Point Width is greater than Max Width")
-        #
-        h = np.round(hFIR / 2 ** (-requireWidth))
+        h, requireWidth = self.convertTapsToInteger(hFIR, maxBitWidth=self.maxBitWidth) 
         numBits = int(requireWidth)
-        print(f"numBits = {numBits}")
 
         searchSet = [2**i for i in range(numBits + 1)] + [
             -(2**i) for i in range(numBits + 1)
@@ -53,12 +59,12 @@ class FIRfilterIntegerCoefficients(object):
 
         denominator = np.sum(hTruncated)
         denominatorShift = np.round(np.log2(abs(denominator)))
-        print(f"Denominator Shift={denominatorShift}")
+        logger.info(f"Denominator Shift={denominatorShift}")
         # TODO: return an integer array with the index location of the sparse factors
         return [hTruncated, np.sign(denominator) * 2**denominatorShift]
 
     @staticmethod
-    def ErrorVectorMetric(h:int, hHat:int)->list(int):
+    def ErrorVectorMetric(h:list[int], hHat:list[int]):
         assert len(h) == len(
             hHat
         ), "Filter lengths should be identical to compute error metric"
@@ -119,8 +125,11 @@ def main():
     hFIR = fir.low_pass(
         gain=g, sampling_freq=fs, cutoff_freq=fs / factor - t / 2, transition_width=t
     )
+    hInteger, reqBits = FIRfilterIntegerCoefficients.convertTapsToInteger(hFIR)
     convertor = FIRfilterIntegerCoefficients()
     [b, a] = convertor(hFIR)
+    evm = FIRfilterIntegerCoefficients.ErrorVectorMetric(b,hInteger)
+    logger.info(f'Error Vector: {evm}')
     for hEll in range(len(hFIR)):
         print(f"{hFIR[hEll]} -> {b[hEll]/a}")
     # print(f'Filter with integer coefficients:{b}')
