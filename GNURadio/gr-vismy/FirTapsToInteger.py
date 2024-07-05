@@ -58,7 +58,7 @@ class FIRfilterIntegerCoefficients(object):
         return [hTruncated, np.sign(denominator) * 2**denominatorShift]
 
     @staticmethod
-    def ErrorVectorMetric(h, hHat):
+    def ErrorVectorMetric(h:int, hHat:int)->list(int):
         assert len(h) == len(
             hHat
         ), "Filter lengths should be identical to compute error metric"

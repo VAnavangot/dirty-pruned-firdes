@@ -25,18 +25,28 @@ class TransportOptimization(object):
         self.iter = 0
         ## Flag to keep track of the end of optimization
         self.stop = False
-        ##
+        ## What is the kind of sparsity budget?
         self._constraintType = sparseType
 
-        if self._constaintType == OptimizationType.UNIFORM_SPARSE:
-            bitSetSize = sparsityBudget // nTaps
-            remainingBudget = sparsityBudget % nTaps
-            if bitSetSize == 0:
-                # Needs additional work to distribute filter representation
-                pass
-            else:
-                self.convertor = FIRfilterIntegerCoefficients(maxBitSetSize=bitSetSize)
+        bitSetSize = sparsityBudget // nTaps
+        self._remainingBudget = sparsityBudget % nTaps
+        if bitSetSize == 0:
+            assert remainingBudget > 0, "Sparsity budget should be strictly positive."
+            # Needs additional work to distribute filter representation
+        else:
+            self.convertor = FIRfilterIntegerCoefficients(maxBitSetSize=bitSetSize)
 
-            if remainingBudget:
-                # allot the bits uniform accross highest k EVMs
-                pass
+        """!
+        if remainingBudget:
+            # Allot the bits uniform accross highest k EVMs where k=remainingBudget and maxBitSetSize=1
+        """
+
+    def __call__(self, hFIR):
+        [hHat, _normalization] = self.convertor(
+            hFIR
+        )  # this will do uniform sparse distribution
+        # Steps to distribute the remaing budget
+        # 1. Identify the absolute error of each coefficient
+        _evm = ErrorVectorMetric(h, hHat)
+        # 2. Add an extra representation value to the k coefficients having the largest EVM
+        return [b, a]
