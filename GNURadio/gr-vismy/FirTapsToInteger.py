@@ -22,6 +22,10 @@ class FIRfilterIntegerCoefficients(object):
         self.maxBitSetSize = maxBitSetSize
         self.maxBitWidth = maxBitWidth
     
+    @property
+    def maxBitSetSize(self):
+        return self.maxBitSetSize
+    
     @staticmethod
     def convertTapsToInteger(hFIR, maxBitWidth:int=20):
         requireWidth = -np.floor(np.log2(np.min(np.abs(hFIR))))
@@ -44,7 +48,7 @@ class FIRfilterIntegerCoefficients(object):
         h, requireWidth = self.convertTapsToInteger(hFIR, maxBitWidth=self.maxBitWidth) 
         numBits = int(requireWidth)
 
-        searchSet = [2**i for i in range(numBits + 1)] + [
+        self.searchSet = searchSet = [2**i for i in range(numBits + 1)] + [
             -(2**i) for i in range(numBits + 1)
         ]
 
