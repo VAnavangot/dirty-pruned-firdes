@@ -103,11 +103,10 @@ class FIRfilterIntegerCoefficients(object):
 
         # it means no subset is found with given sum
         if count == 0:
-
             print("No subset is found")
 
         else:
-            print(np.sum(minSubSet), "-> \t", end="")
+            # print(np.sum(minSubSet), "-> \t", end="")
             if len(minSubSet) <= maxBitSetSize:
                 return minSubSet
             else:
