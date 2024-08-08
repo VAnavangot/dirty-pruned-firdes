@@ -37,6 +37,35 @@ class UniformSparseAssignment(object):
     '''!
             Individual coefficients have a sparsity constraint
     '''
+    def __init__(self, id, hCoeff):
+        ##
+        self.name = f'coeff_{id}'
+        ## Exact Filter Coefficient
+        self.h = hCoeff
+        ## Approximate Filter Coefficient
+        self.hApp = None
+        ## Sparse Representation of the Filter Coefficient
+        self.hRep = []
+        ## Number of shift assignements
+        self.assgn = 0
+        ## Absolute Cost after the approximation; it is hCoeff to start with
+        self._cost = np.abs(hCoeff)
+
+    def __call__(self, maxBitSetSize, numBits=6):
+        searchSet = [2**i for i in range(numBits + 1)] + [0] + [-(2**i) for i in range(numBits + 1)]
+        self.hRep = MinSubsetNearTargetSum(searchSet, 2*(numBits+1), self.h, maxBitSetSize)
+        self.hApp = np.sum(np.array(self.hRep))
+        self.assgn = maxBitSetSize
+
+    @property
+    def cost(self):
+        if self.hApp:
+            self._cost = np.abs(self.h - self.hApp)
+        return self._cost
+
+    def __str__(self):
+        return f'|||{self.name} --- Usage: {self.assgn} | hApp: {self.hApp} | Rep: {self.hRep} | Cost: {self.cost}'
+
 class NonUniformSparseAssignment(object):
     '''!
             Given sparsity budget is distributed across the filter taps to minimize the overall cost function
@@ -64,7 +93,7 @@ class NonUniformSparseAssignment(object):
     def __call__(self, numBits=6):
         maxBitSetSize = self.assgn + 1
         searchSet = [2**i for i in range(numBits + 1)] +[0] + [-(2**i) for i in range(numBits + 1)]
-        self.hRep = self.MinSubsetOfTargetSum(searchSet, 2*(numBits+1), self.h, maxBitSetSize)
+        self.hRep = MinSubsetNearTargetSum(searchSet, 2*(numBits+1), self.h, maxBitSetSize)
         self.hApp = np.sum(np.array(self.hRep))
         self.assgn = maxBitSetSize
 
@@ -86,42 +115,72 @@ class NonUniformSparseAssignment(object):
     def __str__(self):
         return f'|||{self.name} --- Usage: {self.assgn} | hApp: {self.hApp} | Rep: {self.hRep} | Cost: {self.cost}'
 
-    @staticmethod
-    def MinSubsetOfTargetSum(set, n, val, maxBitSetSize):
-        count = 0
-        minSubSet = []
-        sizeSSET = n
-        # identify the shift combinations in the sparse form
-        foundFlag = 0
-        sparseSet = it.combinations(range(n), maxBitSetSize)
-        costVal = val
-        mIdx = []
-        for bits in sparseSet:
-            subSet = [set[i] for i in bits]
-            if (costVal > np.abs(sum(subSet)-val)):
-                costVal = np.abs(sum(subSet)-val)
-                minSubSet = subSet
-        return minSubSet
+def MinSubsetNearTargetSum(set, n, val, maxBitSetSize):
+    count = 0
+    minSubSet = []
+    sizeSSET = n
+    # identify the shift combinations in the sparse form
+    foundFlag = 0
+    sparseSet = it.combinations(range(n), maxBitSetSize)
+    costVal = val
+    mIdx = []
+    for bits in sparseSet:
+        subSet = [set[i] for i in bits]
+        if (costVal > np.abs(sum(subSet)-val)):
+            costVal = np.abs(sum(subSet)-val)
+            minSubSet = subSet
+    return minSubSet
 
 
 
-def main():
-    hCoeffs = [53, 21, 9]
-    sparseBudget = 9
+def main_nusa():
+    hCoeffs = [51, 24, 11, 39, 1, 27, 17, 61, 49, 18]
+    sparseBudget = 27
     nusa = [NonUniformSparseAssignment(i,el) for i,el in enumerate(hCoeffs)]
-    # hh, nn =  convertTapsToInteger(hCoeffs/np.sum(np.array(hCoeffs)))
-    # print(f'IntegerTaps: {hh}, requiredWidth: {nn}')
 
     for s in range(sparseBudget):
         getCost = [nusa[i].cost for i in range(len(nusa))]
-        print(getCost)
         idx = np.argmax(np.array(getCost))
-        print(f'index = {idx}')
         nusa[idx]()
+    
+    for i in range(len(hCoeffs)):
+        print(str(nusa[i]))
+
+    print('-'*5)
+    getCost = [nusa[i].cost for i in range(len(nusa))]
+    print(f'Total Cost NUSA: {np.sum(np.array(getCost))}')
+    print('-'*5)
+
+def main_unsa():
+    hCoeffs = [51, 24, 11, 39, 1, 27, 17, 61, 49, 18]
+    sparseBudget = 27
+    unsa = [UniformSparseAssignment(i,el) for i,el in enumerate(hCoeffs)]
+
+    q = sparseBudget//len(hCoeffs)
+    r = sparseBudget%len(hCoeffs)
+
+    if q:
         for i in range(len(hCoeffs)):
-            print(str(nusa[i]))
+            unsa[i](q)
+    
+    getCost = [unsa[i].cost for i in range(len(unsa))]
+    if r:
+        idxList = np.argsort(np.array(getCost))[-r:]
+        #
+        for idx in idxList:
+            unsa[idx](q+1)
+    
+    for i in range(len(hCoeffs)):
+            print(str(unsa[i]))
+    #
+    print('-'*5)
+    getCost = [unsa[i].cost for i in range(len(unsa))]
+    print(f'Total Cost UNSA: {np.sum(np.array(getCost))}')
+    print('-'*5)
+
 
 
 
 if __name__ == "__main__":
-    main()
+    main_unsa()
+    main_nusa()
