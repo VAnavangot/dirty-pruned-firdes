@@ -88,39 +88,54 @@ def main_hysa(hCoeffs, sparseBudget, reqBits, boundary=None):
     prevCost = 0
     for i in range(len(hCoeffs)):
             prevCost += hysa[i].cost
+    FromList = []
+    NO_EXC_FLAG = False
     for _ in range(sparseBudget):
         minAbsCoeff = [np.min(np.abs(_h._hRep)) if _h._hRep else np.Inf for _h in hysa]
         getCost = [hysa[i].cost for i in range(len(hysa))]
-        fromIdx = np.argmin(minAbsCoeff)
+        FromList = np.where(minAbsCoeff == np.min(minAbsCoeff))[0].tolist()
+        fromIdx = FromList.pop()
+        print(f'FromList: {FromList}, and Index: {fromIdx}')
         toIdx = np.argmax(getCost)
         print(f'fid:{fromIdx} and tid:{toIdx}')
-        if (hysa[fromIdx].cost < hysa[toIdx].cost) & (fromIdx!=toIdx) & (hysa[fromIdx].assgn!=0):
-            # Dummy objects created
-            dummyHYSA = [UniformSparseAssignment(fromIdx, hCoeffs[fromIdx]), UniformSparseAssignment(toIdx, hCoeffs[toIdx])]
-            dummyHYSA[0](maxBitSetSize = hysa[fromIdx].assgn-1, numBits = reqBits)
-            dummyHYSA[1](maxBitSetSize = hysa[toIdx].assgn+1, numBits = reqBits)
-            dSum = dummyHYSA[0].cost + dummyHYSA[1].cost
-            # Total Cost with the Dummy Cost
-            #
-            p = 0
-            for i in np.delete(np.arange(len(hCoeffs)), [fromIdx, toIdx]):
-                p += hysa[i].cost
-            p += dSum
-            print(f'Current TEST Cost: {p}')
+        CONT_FLAG = True
+        # return to this place if p>prevCost and if FromList is non empty
+        while CONT_FLAG:
+            if (hysa[fromIdx].cost < hysa[toIdx].cost) & (fromIdx!=toIdx) & (hysa[fromIdx].assgn!=0):
+                # Dummy objects created
+                dummyHYSA = [UniformSparseAssignment(fromIdx, hCoeffs[fromIdx]), UniformSparseAssignment(toIdx, hCoeffs[toIdx])]
+                dummyHYSA[0](maxBitSetSize = hysa[fromIdx].assgn-1, numBits = reqBits)
+                dummyHYSA[1](maxBitSetSize = hysa[toIdx].assgn+1, numBits = reqBits)
+                dSum = dummyHYSA[0].cost + dummyHYSA[1].cost
+                # Total Cost with the Dummy Cost
+                #
+                p = 0
+                for i in np.delete(np.arange(len(hCoeffs)), [fromIdx, toIdx]):
+                    p += hysa[i].cost
+                p += dSum
+                print(f'Current TEST Cost: {p}')
 
-            if p < prevCost:
-            # if DELTA FROM IDX cost is less than DELTA TO IDX cost then move -- but this will require some effort
-                print('EXCHANGE DONE')
-                hysa[fromIdx](maxBitSetSize = hysa[fromIdx].assgn-1, numBits = reqBits)
-                hysa[toIdx](maxBitSetSize = hysa[toIdx].assgn+1, numBits = reqBits)
-                prevCost = p
-            #
+                if p < prevCost:
+                # if DELTA FROM IDX cost is less than DELTA TO IDX cost then move -- but this will require some effort
+                    print('EXCHANGE DONE')
+                    hysa[fromIdx](maxBitSetSize = hysa[fromIdx].assgn-1, numBits = reqBits)
+                    hysa[toIdx](maxBitSetSize = hysa[toIdx].assgn+1, numBits = reqBits)
+                    prevCost = p
+                    CONT_FLAG = False
+                else:
+                    print('NO EXCHANGE')
+                    if FromList:
+                        fromIdx = FromList.pop()
+                        CONT_FLAG = True
+                    else:
+                        NO_EXC_FLAG = True
+                        break
+                #
             else:
                 print('NO EXCHANGE')
+                NO_EXC_FLAG = True
                 break
-        #
-        else:
-            print('NO EXCHANGE')
+        if NO_EXC_FLAG:
             break
 
 
@@ -139,7 +154,7 @@ if __name__ == "__main__":
     g = 1
     t = 20
     fs = 250
-    factor = 4
+    factor = 8
     hFIR = fir.low_pass(
         gain=g, sampling_freq=fs, cutoff_freq=fs / factor - t / 2, transition_width=t
     )
