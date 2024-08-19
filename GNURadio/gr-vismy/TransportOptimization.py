@@ -36,7 +36,7 @@ The algorithm runs in as many steps as the sparsity budget.
 
 class UniformSparseAssignment(object):
     '''!
-            Individual coefficients have a sparsity constraint
+            Sparsity budget is uniformly distributed among the filter coefficients
     '''
     def __init__(self, id, hCoeff):
         ##
@@ -57,14 +57,21 @@ class UniformSparseAssignment(object):
     def __call__(self, maxBitSetSize, numBits=6):
         self._numCalls += 1
         searchSet = [2**i for i in range(numBits + 1)] + [-(2**i) for i in range(numBits + 1)]
-        self._hRep = MinSubsetNearTargetSum(searchSet, 2*(numBits+1), self.h, maxBitSetSize)
-        self._hApp = np.sum(np.array(self._hRep))
-        self.assgn = maxBitSetSize
+        self._hRep = MinSubsetNearTargetSum(searchSet, 2*(numBits+1), self.h, maxBitSetSize) if maxBitSetSize>0 else []
+        self._hApp = np.sum(np.array(self._hRep)) if self._hRep else None
+        self.assgn = len(self._hRep)
+        self.cost
+        if maxBitSetSize > self.assgn:
+            return (maxBitSetSize)-self.assgn
+        else:
+            return 0
 
     @property
     def cost(self):
         if self._hApp:
             self._cost = np.abs(self.h - self._hApp)
+        else:
+            self._cost = np.abs(self.h)
         return self._cost
     
     @property
@@ -119,7 +126,8 @@ class NonUniformSparseAssignment(object):
         searchSet = [2**i for i in range(numBits + 1)] + [-(2**i) for i in range(numBits + 1)]
         self._hRep = MinSubsetNearTargetSum(searchSet, 2*(numBits+1), self.h, maxBitSetSize)
         self._hApp = np.sum(np.array(self._hRep))
-        self.assgn = maxBitSetSize
+        self.assgn = len(self._hRep)
+        self.cost
 
     @property
     def cost(self):
@@ -161,13 +169,16 @@ def MinSubsetNearTargetSum(set, n, val, maxBitSetSize):
     minSubSet = []
     # identify the shift combinations in the sparse form
     foundFlag = 0
-    sparseSet = it.combinations(range(n), maxBitSetSize)
     costVal = np.Inf
-    mIdx = []
-    for bits in sparseSet:
-        subSet = [set[i] for i in bits]
-        if (costVal > np.abs(sum(subSet)-val)):
-            costVal = np.abs(sum(subSet)-val)
-            minSubSet = subSet
+    for r in range(maxBitSetSize+1):
+        sparseSet = it.combinations(range(n), r)
+        mIdx = []
+        for bits in sparseSet:
+            subSet = [set[i] for i in bits]
+            if (costVal > np.abs(sum(subSet)-val)):
+                costVal = np.abs(sum(subSet)-val)
+                minSubSet = subSet
+        if costVal==0:
+            return minSubSet
     return minSubSet
 
